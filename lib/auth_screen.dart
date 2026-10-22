@@ -15,13 +15,11 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _showError = false;
 
   void _login() {
-    // Логика проверки (п.12)
     if (_emailController.text == "user@example.com" &&
         _passwordController.text == "456321") {
       setState(() {
         _showError = false;
       });
-      // Переход на экран BMI (п.13)
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const BmiScreen()),
@@ -36,14 +34,13 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5), // Фон (п.4)
+      backgroundColor: const Color(0xFFF5F5F5),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Заголовок (п.4)
               const Text(
                 "Вход в приложение",
                 style: TextStyle(
@@ -54,7 +51,6 @@ class _AuthScreenState extends State<AuthScreen> {
               ),
               const SizedBox(height: 20),
               
-              // Карточка (п.5, 9)
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -70,39 +66,62 @@ class _AuthScreenState extends State<AuthScreen> {
                 ),
                 child: Column(
                   children: [
-                    // Поле Email (п.7)
-                    TextField(
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: const InputDecoration(
-                        labelText: "Email",
-                        labelStyle: TextStyle(color: Colors.grey),
-                        enabledBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: Colors.grey),
+                    // Поле Email
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Сдвигаем текст подписи вправо на 12 пикселей
+                        const Padding(
+                          padding: EdgeInsets.only(left: 0.0),
+                          child: Text("Email", style: TextStyle(color: Colors.grey, fontSize: 14)),
                         ),
-                        focusedBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: Color(0xFF4CAF50)),
+                        TextField(
+                          controller: _emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          decoration: const InputDecoration(
+                            hintText: "example@gmail.com",
+                            hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
+                            enabledBorder: UnderlineInputBorder(
+                              borderSide: BorderSide(color: Colors.grey),
+                            ),
+                            focusedBorder: UnderlineInputBorder(
+                              borderSide: BorderSide(color: Color(0xFF4CAF50)),
+                            ),
+                            // Сдвигаем текст внутри поля вправо на 12 пикселей, убираем вертикальные отступы
+                            contentPadding: EdgeInsets.only(left: 12.0, top: 0, bottom: 4),
+                            isDense: true,
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                     const SizedBox(height: 15),
-                    // Поле Пароль (п.8)
-                    TextField(
-                      controller: _passwordController,
-                      obscureText: true,
-                      decoration: const InputDecoration(
-                        labelText: "Пароль",
-                        labelStyle: TextStyle(color: Colors.grey),
-                        enabledBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: Colors.grey),
+                    // Поле Пароль
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.only(left: 0.0),
+                          child: Text("Пароль", style: TextStyle(color: Colors.grey, fontSize: 14)),
                         ),
-                        focusedBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: Color(0xFF4CAF50)),
+                        TextField(
+                          controller: _passwordController,
+                          obscureText: true,
+                          decoration: const InputDecoration(
+                            hintText: "Введите пароль",
+                            hintStyle: TextStyle(color: Colors.grey, fontSize: 14),
+                            enabledBorder: UnderlineInputBorder(
+                              borderSide: BorderSide(color: Colors.grey),
+                            ),
+                            focusedBorder: UnderlineInputBorder(
+                              borderSide: BorderSide(color: Color(0xFF4CAF50)),
+                            ),
+                            contentPadding: EdgeInsets.only(left: 12.0, top: 0, bottom: 4),
+                            isDense: true,
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                     const SizedBox(height: 20),
-                    // Кнопка Регистрация (п.5, 6)
                     GestureDetector(
                       onTap: () {
                         Navigator.push(
@@ -124,7 +143,6 @@ class _AuthScreenState extends State<AuthScreen> {
               ),
               const SizedBox(height: 30),
               
-              // Кнопка Войти (п.10)
               SizedBox(
                 width: double.infinity,
                 height: 50,
@@ -147,7 +165,6 @@ class _AuthScreenState extends State<AuthScreen> {
                 ),
               ),
               
-              // Текст ошибки (п.11)
               if (_showError)
                 const Padding(
                   padding: EdgeInsets.only(top: 15),

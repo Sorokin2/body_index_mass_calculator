@@ -37,13 +37,13 @@ class RegistrationScreen extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                    _buildTextField("Имя", "Введите ваше имя"),
+                    _buildCustomTextField("Имя", "Введите ваше имя"),
                     const SizedBox(height: 15),
-                    _buildTextField("Фамилия", "Введите вашу фамилию"),
+                    _buildCustomTextField("Фамилия", "Введите вашу фамилию"),
                     const SizedBox(height: 15),
-                    _buildTextField("Email", "example@gmail.com"),
+                    _buildCustomTextField("Email", "example@gmail.com"),
                     const SizedBox(height: 15),
-                    _buildTextField("Пароль", "Введите пароль", isObscure: true),
+                    _buildCustomTextField("Пароль", "Введите пароль", isObscure: true),
                     const SizedBox(height: 20),
                     GestureDetector(
                       onTap: () => Navigator.pop(context),
@@ -90,21 +90,32 @@ class RegistrationScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTextField(String label, String hint, {bool isObscure = false}) {
-    return TextField(
-      obscureText: isObscure,
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        hintStyle: const TextStyle(color: Colors.grey, fontSize: 14),
-        labelStyle: const TextStyle(color: Colors.grey),
-        enabledBorder: const UnderlineInputBorder(
-          borderSide: BorderSide(color: Colors.grey),
+  Widget _buildCustomTextField(String label, String hint, {bool isObscure = false}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Сдвиг подписи вправо на 12 пикселей
+        Padding(
+          padding: const EdgeInsets.only(left: 0.0),
+          child: Text(label, style: const TextStyle(color: Colors.grey, fontSize: 14)),
         ),
-        focusedBorder: const UnderlineInputBorder(
-          borderSide: BorderSide(color: Color(0xFF4CAF50)),
+        TextField(
+          obscureText: isObscure,
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: const TextStyle(color: Colors.grey, fontSize: 14),
+            enabledBorder: const UnderlineInputBorder(
+              borderSide: BorderSide(color: Colors.grey),
+            ),
+            focusedBorder: const UnderlineInputBorder(
+              borderSide: BorderSide(color: Color(0xFF4CAF50)),
+            ),
+            // Сдвиг текста внутри поля вправо на 12 пикселей, убираем лишний верх/низ
+            contentPadding: const EdgeInsets.only(left: 12.0, top: 0, bottom: 4),
+            isDense: true,
+          ),
         ),
-      ),
+      ],
     );
   }
 }
