@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'profile_screen.dart';
 
 class BmiScreen extends StatefulWidget {
@@ -11,15 +12,17 @@ class BmiScreen extends StatefulWidget {
 class _BmiScreenState extends State<BmiScreen> {
   final TextEditingController _heightController = TextEditingController();
   final TextEditingController _weightController = TextEditingController();
-  
+
   bool _isCalculated = false;
+  bool _isSaving = false;
   bool _showError = false;
-  
+
   String _bmiResult = "";
   String _recommendation = "";
 
-  void _calculateBmi() {
-    // Сброс ошибок
+  Future<void> _calculateBmi() async {
+    FocusScope.of(context).unfocus();
+
     setState(() {
       _showError = false;
       _isCalculated = false;
@@ -28,11 +31,8 @@ class _BmiScreenState extends State<BmiScreen> {
     final String heightText = _heightController.text.trim();
     final String weightText = _weightController.text.trim();
 
-    // Проверка на пустые поля (п.9)
     if (heightText.isEmpty || weightText.isEmpty) {
-      setState(() {
-        _showError = true;
-      });
+      setState(() => _showError = true);
       return;
     }
 
@@ -40,18 +40,14 @@ class _BmiScreenState extends State<BmiScreen> {
     final double? weight = double.tryParse(weightText);
 
     if (height == null || weight == null || height <= 0 || weight <= 0) {
-      setState(() {
-        _showError = true; // Можно вывести другую ошибку, но по ТЗ просят "Заполните все поля"
-      });
+      setState(() => _showError = true);
       return;
     }
 
-    // Расчет ИМТ
-    double heightInMeters = height / 100;
-    double bmi = weight / (heightInMeters * heightInMeters);
+    final double heightInMeters = height / 100;
+    final double bmi = weight / (heightInMeters * heightInMeters);
 
     String rec = "";
-    // Логика рекомендаций (п.12)
     if (bmi <= 16) {
       rec = "Выраженный дефицит массы тела. Советуем набирать вес для здоровья.";
     } else if (bmi > 16 && bmi < 18.5) {
@@ -68,11 +64,90 @@ class _BmiScreenState extends State<BmiScreen> {
       rec = "Очень резкое ожирение. Требуется срочная коррекция веса под наблюдением врача.";
     }
 
+    // 1) Сначала показываем результат — UI отзывчив
     setState(() {
       _bmiResult = bmi.toStringAsFixed(1);
       _recommendation = rec;
       _isCalculated = true;
     });
+
+    // 2) Сохранение запускаем «в фоне», не блокируя интерфейс
+    //    (не await — пользователь уже видит результат)
+    _saveCalculation(
+      height: height,
+      weight: weight,
+      bmi: bmi,
+      recommendation: rec,
+    );
+  }
+
+  /// Сохранение расчёта в таблицу body_mass_index_calculations
+  Future<void> _saveCalculation({
+    required double height,
+    required double weight,
+    required double bmi,
+    required String recommendation,
+  }) async {
+    final user = Supabase.instance.client.auth.currentUser;
+
+    if (user == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Войдите в аккаунт, чтобы сохранять расчёты"),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    if (mounted) setState(() => _isSaving = true);
+
+    try {
+      await Supabase.instance.client
+          .from('body_mass_index_calculations')
+          .insert({
+        'height': height.round(),
+        'weight': weight.round(),
+        'body_mass_index': bmi,
+        'recommendation': recommendation,
+        'user_id': user.id,
+      });
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Расчёт сохранён"),
+          backgroundColor: Color(0xFF4CAF50),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } on PostgrestException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Не удалось сохранить расчёт: ${e.message}"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Ошибка сети. Расчёт не сохранён."),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _heightController.dispose();
+    _weightController.dispose();
+    super.dispose();
   }
 
   @override
@@ -80,14 +155,12 @@ class _BmiScreenState extends State<BmiScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       body: Center(
-        // Выравнивание контента по центру (п.1, 2, 6)
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Заголовок (п.2)
               const Text(
                 "Индекс массы тела",
                 style: TextStyle(
@@ -97,8 +170,7 @@ class _BmiScreenState extends State<BmiScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-              
-              // Карточка ввода (п.1, 10)
+
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
@@ -119,7 +191,7 @@ class _BmiScreenState extends State<BmiScreen> {
                     const Text(
                       "Персональные данные",
                       style: TextStyle(
-                        color: Color(0xFF4CAF50), // п.4
+                        color: Color(0xFF4CAF50),
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),
@@ -127,49 +199,75 @@ class _BmiScreenState extends State<BmiScreen> {
                     const SizedBox(height: 10),
                     TextField(
                       controller: _heightController,
-                      keyboardType: TextInputType.number,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      enabled: !_isSaving,
                       decoration: const InputDecoration(
                         labelText: "Рост (см)",
                         labelStyle: TextStyle(color: Colors.grey),
-                        enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey)),
-                        focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF4CAF50))),
+                        enabledBorder: UnderlineInputBorder(
+                          borderSide: BorderSide(color: Colors.grey),
+                        ),
+                        focusedBorder: UnderlineInputBorder(
+                          borderSide: BorderSide(color: Color(0xFF4CAF50)),
+                        ),
                       ),
                     ),
                     TextField(
                       controller: _weightController,
-                      keyboardType: TextInputType.number,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      enabled: !_isSaving,
                       decoration: const InputDecoration(
                         labelText: "Вес (кг)",
                         labelStyle: TextStyle(color: Colors.grey),
-                        enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey)),
-                        focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF4CAF50))),
+                        enabledBorder: UnderlineInputBorder(
+                          borderSide: BorderSide(color: Colors.grey),
+                        ),
+                        focusedBorder: UnderlineInputBorder(
+                          borderSide: BorderSide(color: Color(0xFF4CAF50)),
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 20),
-              
-              // Кнопка Рассчитать (п.10)
+
               SizedBox(
-                width: double.infinity, // Одинаковая ширина с карточкой
+                width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  onPressed: _calculateBmi,
+                  onPressed: _isSaving ? null : _calculateBmi,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF4CAF50),
+                    disabledBackgroundColor: const Color(0xFFA5D6A7),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  child: const Text(
-                    "РАССЧИТАТЬ",
-                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
+                  child: _isSaving
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2.5,
+                          ),
+                        )
+                      : const Text(
+                          "РАССЧИТАТЬ",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
               ),
-              
-              // Текст ошибки (п.9)
+
               if (_showError)
                 const Padding(
                   padding: EdgeInsets.only(top: 15),
@@ -178,26 +276,27 @@ class _BmiScreenState extends State<BmiScreen> {
                     style: TextStyle(color: Colors.red, fontSize: 14),
                   ),
                 ),
-              
+
               const SizedBox(height: 20),
-              
-              // Карточка результата (п.5, 7, 8, 11)
+
               if (_isCalculated)
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE8F5E9), // п.5
+                    color: const Color(0xFFE8F5E9),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF4CAF50).withOpacity(0.3)),
+                    border: Border.all(
+                      color: const Color(0xFF4CAF50).withOpacity(0.3),
+                    ),
                   ),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start, // Надпись слева
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
                         "Ваш индекс массы тела:",
                         style: TextStyle(
-                          color: Color(0xFF4CAF50), // п.7
+                          color: Color(0xFF4CAF50),
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
                         ),
@@ -209,7 +308,7 @@ class _BmiScreenState extends State<BmiScreen> {
                           style: const TextStyle(
                             fontSize: 32,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF4CAF50), // п.7
+                            color: Color(0xFF4CAF50),
                           ),
                         ),
                       ),
@@ -217,7 +316,10 @@ class _BmiScreenState extends State<BmiScreen> {
                       Text(
                         _recommendation,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: Color(0xFF757575), fontSize: 14), // п.11
+                        style: const TextStyle(
+                          color: Color(0xFF757575),
+                          fontSize: 14,
+                        ),
                       ),
                     ],
                   ),
@@ -226,28 +328,24 @@ class _BmiScreenState extends State<BmiScreen> {
           ),
         ),
       ),
-      
-      // Нижняя панель навигации (п.3)
+
       bottomNavigationBar: Container(
-        height: 60, // Фиксированная высота
+        height: 60,
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.1),
               blurRadius: 10,
-              offset: const Offset(0, -3), // Тень сверху
+              offset: const Offset(0, -3),
             ),
           ],
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            // Кнопка Калькулятор (п.13)
             GestureDetector(
-              onTap: () {
-                // Мы уже на этой странице, ничего не делаем
-              },
+              onTap: () {},
               child: const Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -258,12 +356,13 @@ class _BmiScreenState extends State<BmiScreen> {
                 ],
               ),
             ),
-            // Кнопка Профиль (п.14)
             GestureDetector(
               onTap: () {
-                Navigator.pushReplacement( // Заменяем экран, чтобы не плодить стек
+                Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                  MaterialPageRoute(
+                    builder: (context) => const ProfileScreen(),
+                  ),
                 );
               },
               child: const Column(
